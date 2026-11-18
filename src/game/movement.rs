@@ -1,6 +1,5 @@
 use macroquad::prelude::*;
 
-use crate::game::camera::SENS;
 use crate::game::player::{
     CROUCH_SPEED, GRAVITY, JUMP_VEL, PLAYER_R, SPRINT_SPEED, STAMINA_DRAIN, STAMINA_MAX,
     STAMINA_REGEN, WALK_SPEED,
@@ -30,7 +29,6 @@ impl Game {
         self.player.ads = is_mouse_button_down(MouseButton::Right);
         self.player.mouse_sway.x = (self.player.mouse_sway.x + look.x * 0.03).clamp(-0.5, 0.5);
         self.player.mouse_sway.y = (self.player.mouse_sway.y + look.y * 0.03).clamp(-0.5, 0.5);
-        let _ = SENS;
     }
 
     pub(crate) fn update_weapon_switch(&mut self, save: &Save, wheel_y: f32) {
@@ -43,8 +41,9 @@ impl Game {
         if is_key_pressed(KeyCode::Key3) {
             self.switch_weapon(1, save);
         }
-        if wheel_y.abs() > 0.1 {
-            let dir = if wheel_y > 0.0 { -1 } else { 1 };
+
+        if wheel_y.abs() > 0.5 {
+            let dir: i32 = if wheel_y > 0.0 { -1 } else { 1 };
             self.cycle_loadout_weapon(save, dir);
         }
     }

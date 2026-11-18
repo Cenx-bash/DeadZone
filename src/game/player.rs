@@ -152,7 +152,7 @@ impl Player {
         let dip = -self.land_dip * 0.18;
         vec3(
             self.pos.x + lean_offset,
-            self.eye_height() + self.bob.sin() * 0.035 + dip,
+            self.eye_height() + self.bob.sin() * 0.035 + dip + self.pos.y,
             self.pos.z,
         )
     }

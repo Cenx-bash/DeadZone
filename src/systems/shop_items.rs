@@ -56,7 +56,7 @@ pub const INGAME_SHOP: [ShopItem; 7] = [
     ShopItem {
         name: "NUKE",
         desc: "Wipes ALL zombies on the map",
-        price: 100_000,
+        price: 10_000,
         kind: ItemKind::Nuke,
     },
 ];

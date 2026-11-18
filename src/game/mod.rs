@@ -11,7 +11,7 @@ use crate::systems::save::Save;
 use crate::weapons::combat::{FloatingText, Grenade, Mine, MineKind, Particle, Shell, Tracer};
 use crate::weapons::weapon::WEAPONS;
 use crate::zombies::ai::Projectile;
-use crate::zombies::enemy::Enemy;
+use crate::zombies::enemy::{Enemy, ZombieKind};
 
 use camera::{look_dir, rotate_around_axis};
 use player::Player;
@@ -40,6 +40,7 @@ pub struct Game {
     pub grenades: Vec<Grenade>,
     pub mines: Vec<Mine>,
     pub nuke_flash: f32,
+    pub pending_hive_spawns: Vec<(Vec3, u32)>,
 }
 
 impl Game {
@@ -73,6 +74,7 @@ impl Game {
             grenades: Vec::new(),
             mines: Vec::new(),
             nuke_flash: 0.0,
+            pending_hive_spawns: Vec::new(),
         }
     }
 
@@ -230,15 +232,15 @@ impl Game {
             let w = e.kind.radius() * 1.6;
             let bob = e.phase.sin().abs() * 0.10;
             let col = if e.flash > 0.0 { WHITE } else { e.kind.color() };
-            let crawler = matches!(e.kind, crate::zombies::enemy::ZombieKind::Crawler);
+            let crawler = matches!(e.kind, ZombieKind::Crawler);
             let body_y = if crawler { h * 0.3 } else { h * 0.35 };
             let body_h = if crawler { h * 0.5 } else { h * 0.7 };
-            let body = vec3(e.pos.x, body_y + bob, e.pos.z);
+            let body = vec3(e.pos.x, body_y + bob + e.pos.y, e.pos.z);
             draw_cube(body, vec3(w, body_h, w * 0.8), None, col);
             draw_cube_wires(body, vec3(w, body_h, w * 0.8), BLACK);
 
             if !crawler {
-                let head = vec3(e.pos.x, h * 0.85 + bob, e.pos.z);
+                let head = vec3(e.pos.x, h * 0.85 + bob + e.pos.y, e.pos.z);
                 draw_sphere(head, w * 0.35, None, col);
                 if e.is_boss {
                     draw_sphere(head, w * 0.5, None, Color::new(1.0, 0.2, 0.2, 0.25));
@@ -248,7 +250,7 @@ impl Game {
             if e.hp < e.max_hp {
                 let hp_pct = (e.hp / e.max_hp).clamp(0.0, 1.0);
                 let bar_w = w * 1.8;
-                let bar_y = h + 0.3;
+                let bar_y = h + 0.3 + e.pos.y;
                 draw_cube(
                     vec3(e.pos.x, bar_y, e.pos.z),
                     vec3(bar_w, 0.06, 0.03),

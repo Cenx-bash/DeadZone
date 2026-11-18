@@ -7,6 +7,7 @@ use crate::systems::audio;
 use crate::systems::save::Save;
 use crate::weapons::attachments::compute_mods;
 use crate::weapons::weapon::WEAPONS;
+use crate::zombies::enemy::Ability;
 
 pub struct Tracer {
     pub a: Vec3,
@@ -205,6 +206,30 @@ impl Game {
                 self.kills += 1;
                 let center = vec3(e.pos.x, e.kind.height() * 0.4, e.pos.z);
                 self.burst(center, 16, e.kind.color(), 5.0);
+
+                if let Ability::Explode { radius, damage } = e.kind.ability() {
+                    for other in self.enemies.iter_mut() {
+                        let d = vec3(other.pos.x - e.pos.x, 0.0, other.pos.z - e.pos.z).length();
+                        if d < radius {
+                            let fall = 1.0 - d / radius;
+                            other.hp -= damage * fall;
+                        }
+                    }
+                    let pd = vec3(
+                        self.player.pos.x - e.pos.x,
+                        0.0,
+                        self.player.pos.z - e.pos.z,
+                    )
+                    .length();
+                    if pd < radius {
+                        let fall = 1.0 - pd / radius;
+                        self.player.health -= damage * fall * 0.6;
+                        self.player.hurt_flash = 0.5;
+                    }
+                    self.burst(e.pos, 40, Color::new(0.7, 0.85, 0.35, 1.0), 8.0);
+                    audio::sfx_explosion();
+                }
+
                 let roll = rand::gen_range(0.0, 1.0);
                 if roll < 0.12 && self.player.armor < 50.0 {
                     self.player.armor = (self.player.armor + 10.0).min(50.0);
@@ -433,7 +458,23 @@ impl Game {
             if hs {
                 any_headshot = true;
             }
-            self.enemies[i].hp -= dmg;
+            let mut final_dmg = dmg;
+
+            if let Ability::Armor { front_mult } = self.enemies[i].kind.ability() {
+                let to_player = vec3(
+                    self.player.pos.x - self.enemies[i].pos.x,
+                    0.0,
+                    self.player.pos.z - self.enemies[i].pos.z,
+                )
+                .normalize_or_zero();
+                let from = (point - self.enemies[i].pos).normalize_or_zero();
+                let facing = -to_player;
+                if facing.dot(from) > 0.4 {
+                    final_dmg *= front_mult;
+                }
+            }
+
+            self.enemies[i].hp -= final_dmg;
             self.enemies[i].flash = 0.08;
             self.player.hit_mark = 0.12;
             let color = if hs {
@@ -452,7 +493,7 @@ impl Game {
             }
             if self.player.ability_lv[9] > 0 && !w.is_melee {
                 let radius = 1.2 + self.player.ability_lv[9] as f32 * 0.5;
-                let aoe = dmg * 0.25 * self.player.ability_lv[9] as f32;
+                let aoe = final_dmg * 0.25 * self.player.ability_lv[9] as f32;
                 for j in 0..self.enemies.len() {
                     if j == i {
                         continue;
@@ -707,17 +748,23 @@ impl Game {
 
     pub(crate) fn cycle_loadout_weapon(&mut self, save: &Save, dir: i32) {
         let order: [usize; 3] = [save.loadout_primary, save.loadout_secondary, 1];
-        let pos = order
-            .iter()
-            .position(|&x| x == self.player.equipped)
-            .unwrap_or(0);
+
+        let pos = match order.iter().position(|&x| x == self.player.equipped) {
+            Some(p) => p as i32,
+            None => 0,
+        };
+
         for step in 1..=3 {
-            let next = ((pos as i32 + dir * step).rem_euclid(3)) as usize;
+            let next = (pos + dir.signum() * step).rem_euclid(3) as usize;
             let target = order[next];
-            if save.owned_weapons[target] && target != self.player.equipped {
-                self.switch_weapon(target, save);
-                return;
+            if target == self.player.equipped {
+                continue;
             }
+            if !save.owned_weapons[target] {
+                continue;
+            }
+            self.switch_weapon(target, save);
+            return;
         }
     }
 
